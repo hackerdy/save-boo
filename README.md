@@ -12,6 +12,10 @@ python3 -m http.server
 
 Then visit http://localhost:8000.
 
+## Sound
+
+Sound effects are synthesized with the WebAudio API (no audio files). Audio starts after your first click; use the 🔊/🔇 button in the header to mute. Your choice is remembered.
+
 ## Challenges
 
 1. The Sacred Checkbox

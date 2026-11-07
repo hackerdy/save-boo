@@ -87,3 +87,6 @@ input[type=text], textarea {
 
 .confetti { position: fixed; top: -30px; font-size: 28px; animation: fall 3.5s linear forwards; pointer-events: none; z-index: 10; }
 @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
+
+header { position: relative; }
+#muteBtn { position: absolute; top: 0; right: 0; padding: 4px 10px; font-size: 20px; background: transparent; border: 1px solid #3a3360; border-radius: 8px; cursor: pointer; }

@@ -16,6 +16,7 @@ function mood(m) {
   // m: 'happy' | 'angry' | 'neutral'
   const d = { happy: 'M45 96 q15 14 30 0', angry: 'M45 104 q15 -14 30 0', neutral: 'M45 98 q15 -10 30 0' }[m];
   grandMouth.setAttribute('d', d);
+  if (m === 'angry') sfx.play('buzz');
 }
 function shake() {
   const g = $('#grand');
@@ -59,6 +60,7 @@ function cRunaway(done) {
   const react = (e) => {
     if (dodges >= need) return;
     dodges++;
+    sfx.play('dodge');
     flee();
     shake();
     if (dodges === 3) say("Hm, it seems nervous. Ghosts are like that. Are YOU nervous, ghost?");
@@ -127,12 +129,13 @@ function cBreathe(done) {
     if (p >= 1 && !full) { full = true; msg.textContent = 'Now EXHALE — let go slowly...'; }
     raf = requestAnimationFrame(tick);
   };
-  const start = (e) => { e.preventDefault(); holdStart = performance.now(); full = false; msg.textContent = 'Inhaling...'; tick(); };
+  const start = (e) => { e.preventDefault(); holdStart = performance.now(); full = false; sfx.play('inhale'); msg.textContent = 'Inhaling...'; tick(); };
   const end = () => {
     if (!holdStart) return;
     cancelAnimationFrame(raf);
     holdStart = 0;
     if (full) {
+      sfx.play('exhale');
       cycles++;
       bar.style.width = '0%';
       if (cycles >= need) return done("Oxygen detected. Suspicious, but acceptable.");
@@ -155,6 +158,7 @@ function cHeart(done) {
   say("Humans have a rhythm. Tap it out. Not too fast (panicking), not too slow (dead — well, I'd be fine with that).");
   const msg = $('#hMsg'), heart = $('#heart');
   $('#tap').onclick = () => {
+    sfx.play('thump');
     const now = performance.now();
     if (taps.length && now - taps[taps.length - 1] > 1600) taps = [];
     taps.push(now);
@@ -194,7 +198,7 @@ async function start() {
   chal.innerHTML = `<div class="center"><p style="font-size:18px">Oh no! Little Boo has faded away. Only a verified <b>human</b> can bring her back to life.</p><button id="begin">Begin the Trials</button></div>`;
   mood('neutral');
   say("Greetings, mortal. Or ghost pretending to be mortal. My granddaughter Boo is fading. Prove you're human to save her. No pressure. (Lots of pressure.)");
-  $('#begin').onclick = next;
+  $('#begin').onclick = () => { sfx.unlock(); next(); };
 }
 
 function next() {
@@ -208,6 +212,7 @@ function next() {
 async function onPass(msg) {
   step++;
   mood('happy');
+  sfx.play('chime');
   updateProgress(challenges.length);
   say(msg);
   chal.innerHTML = `<div class="center"><p class="big">✅</p><button id="nextBtn">${step >= challenges.length ? 'Wake up Boo!' : 'Next trial →'}</button></div>`;
@@ -233,6 +238,7 @@ async function finale() {
   chal.innerHTML = `<div class="center big">✨</div>`;
   await sleep(2200);
   confetti();
+  sfx.play('fanfare');
   say('"Gaga?" — Boo is ALIVE! Thank you, human. (Probably.)');
   chal.innerHTML = `<div class="center"><p class="big">🎉👻🎉</p><p>Boo has been revived thanks to your humanity.</p><p style="opacity:.7;font-size:14px">Mortimer's secret: there was no verification. He just wanted to see how far a human would go for a baby ghost. Which, frankly, is the most human thing of all.</p><button id="again">Play again</button></div>`;
   $('#again').onclick = start;
