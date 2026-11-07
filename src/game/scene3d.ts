@@ -28,6 +28,10 @@ export interface SceneApi {
   punch(): void;
   pass(): void;
   finale(): void;
+  /** No shake, camera sway or parallax. */
+  setReducedMotion(on: boolean): void;
+  /** Cap pixel ratio and hide most particles. Also switched on automatically on slow frames. */
+  setLowPower(on: boolean): void;
   reset(): void;
   dispose(): void;
 }
@@ -35,7 +39,7 @@ export interface SceneApi {
 export function createScene(canvas: HTMLCanvasElement): SceneApi {
   const api: SceneApi = {
     ok: false,
-    setProgress() {}, mood() {}, shake() {}, mouth() {}, cam() {}, punch() {}, pass() {}, finale() {}, reset() {}, dispose() {},
+    setProgress() {}, mood() {}, shake() {}, mouth() {}, cam() {}, punch() {}, pass() {}, finale() {}, setReducedMotion() {}, setLowPower() {}, reset() {}, dispose() {},
   };
   let renderer: THREE.WebGLRenderer;
   try {
@@ -45,7 +49,8 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   } catch (e) { return api; }
 
   const small = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
-  const MAXDPR = small ? 1.5 : 2;
+  let MAXDPR = small ? 1.5 : 2;
+  let reducedMotion = false;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAXDPR));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -294,6 +299,13 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
   const tmpLook = new THREE.Vector3();
 
+  function applyLowPower(on: boolean) {
+    MAXDPR = on ? 1 : small ? 1.5 : 2;
+    ffGeo.setDrawRange(0, on ? 18 : FF);
+    mists.forEach((m, i) => { m.visible = !on || i % 3 === 0; });
+    resize();
+  }
+
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAXDPR));
@@ -316,6 +328,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   /* ---------- loop ---------- */
   let running = true, disposed = false, raf = 0;
+  let autoLow = false, slowN = 0, slowSum = 0;
   const onVisibility = () => { running = !document.hidden; if (running) clock.getDelta(); };
   document.addEventListener('visibilitychange', onVisibility);
 
@@ -323,7 +336,14 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     if (disposed) return;
     raf = requestAnimationFrame(frame);
     if (!running) return;
-    const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    const rawDt = clock.getDelta();
+    const dt = Math.min(rawDt, 0.05), t = clock.elapsedTime;
+    // Auto low-power: if 90 frames average slower than ~24fps, drop resolution and particles once.
+    if (!autoLow) {
+      slowN++; slowSum += rawDt;
+      if (slowN >= 90) { if (slowSum / slowN > 0.042) { autoLow = true; applyLowPower(true); } slowN = 0; slowSum = 0; }
+    }
+    const mot = reducedMotion ? 0 : 1;
 
     st.progress += (st.target - st.progress) * Math.min(1, dt * 2);
     st.shake *= Math.pow(0.02, dt); st.punch *= Math.pow(0.003, dt);
@@ -346,10 +366,10 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
     // Mortimer
     const angry = st.angry, happy = st.mood === 'happy' ? 1 : 0;
-    const sx = Math.sin(t * 60) * st.shake * 0.25;
+    const sx = Math.sin(t * 60) * st.shake * 0.25 * mot;
     mort.root.position.set(MORT_POS.x + sx, MORT_POS.y + Math.sin(t * 1.2) * 0.18 + happy * Math.abs(Math.sin(t * 3)) * 0.1, MORT_POS.z);
     mort.root.rotation.y = -0.4 + Math.sin(t * 0.6) * 0.08;
-    mort.root.rotation.z = Math.sin(t * 70) * st.shake * 0.08;
+    mort.root.rotation.z = Math.sin(t * 70) * st.shake * 0.08 * mot;
     const mscale = 1.5 * (1 + angry * 0.15);
     mort.root.scale.setScalar(mscale);
     mort.body.material.emissive.setHex(angry > 0.15 ? 0xa02030 : 0x5a5fa0);
@@ -406,9 +426,9 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     const k = 1 - Math.pow(0.12, dt);
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.set(
-      camPos.x + Math.sin(t * 0.25) * 0.35 + px * 0.35 + (Math.random() - 0.5) * st.punch * 0.3,
-      camPos.y + Math.sin(t * 0.33) * 0.15 - py * 0.15 + (Math.random() - 0.5) * st.punch * 0.3,
-      camPos.z - st.punch * 0.9,
+      camPos.x + mot * (Math.sin(t * 0.25) * 0.35 + px * 0.35 + (Math.random() - 0.5) * st.punch * 0.3),
+      camPos.y + mot * (Math.sin(t * 0.33) * 0.15 - py * 0.15 + (Math.random() - 0.5) * st.punch * 0.3),
+      camPos.z - mot * st.punch * 0.9,
     );
     tmpLook.copy(camLook);
     camera.lookAt(tmpLook);
@@ -426,6 +446,8 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     mouth(who: Who, v: number) { st.mouth[who] = v; },
     cam(i: number) { st.camIdx = Math.max(0, Math.min(CAMS.length - 1, i)); },
     punch() { st.punch = 1; },
+    setReducedMotion(on: boolean) { reducedMotion = on; canvas.dataset.reduced = on ? '1' : '0'; },
+    setLowPower(on: boolean) { if (!autoLow) applyLowPower(on); },
     pass() { st.pass = 1; st.hop = 1; },
     reset() { st.finale = 0; st.camIdx = 0; st.target = 0; burstT = -1; flash.intensity = 0; bMat.opacity = 0; (scene.background as THREE.Color).setRGB(0.04, 0.03, 0.13); },
     finale() {

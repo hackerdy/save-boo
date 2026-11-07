@@ -17,6 +17,8 @@ export const voice = (() => {
   let current: Current | null = null;
   let mouthCb: (who: Who, v: number) => void = () => {};
   let token = 0;
+  let voiceOn = true;       // user setting: voice lines on/off (subtitles always show)
+  const listeners = new Set<() => void>();
 
   const PROFILES: Record<Who, Profile> = {
     grand: {
@@ -29,16 +31,44 @@ export const voice = (() => {
     },
   };
 
-  const loadVoices = () => { if (supported) voices = synth.getVoices() || []; };
-  if (supported) {
+  const loadVoices = () => {
+    if (!supported) return;
+    voices = synth.getVoices() || [];
+    listeners.forEach((f) => f());
+  };
+  let polls = 0;
+  let pollTimer: ReturnType<typeof setTimeout> | undefined;
+  // Some browsers never fire voiceschanged, so poll briefly as well.
+  const poll = () => {
     loadVoices();
+    if (!voices.length && polls++ < 8) pollTimer = setTimeout(poll, 500);
+  };
+  if (supported) {
     synth.addEventListener('voiceschanged', loadVoices);
+    poll();
   }
 
   function pickVoice(who: Who): SpeechSynthesisVoice | null {
     const en = voices.filter((v) => /^en[-_]/i.test(v.lang) || /^en$/i.test(v.lang));
     const pool = en.length ? en : voices;
-    for (const re of PROFILES[who].prefer) {
+    const pickFrom = (list: SpeechSynthesisVoice[]) => {
+      for (const re of PROFILES[who].prefer) {
+        const v = list.find((x) => re.test(x.name));
+        if (v) return v;
+      }
+      return list.find((v) => v.default) || list[0] || null;
+    };
+    const mine = pickFrom(pool);
+    // Keep Mortimer and Boo audibly different when the system offers more than one voice.
+    if (who === 'boo' && mine && pool.length > 1) {
+      const theirs = pickGrand(pool);
+      if (theirs && theirs.name === mine.name) return pool.find((x) => x.name !== mine.name) || mine;
+    }
+    return mine;
+  }
+
+  function pickGrand(pool: SpeechSynthesisVoice[]) {
+    for (const re of PROFILES.grand.prefer) {
       const v = pool.find((x) => re.test(x.name));
       if (v) return v;
     }
@@ -93,9 +123,9 @@ export const voice = (() => {
       const finish = () => { if (current === c) stopCurrent(); else resolve(); };
 
       // Muted or no speech: still animate the mouth, resolve quickly.
-      if (!enabled || isMuted() || !supported) {
+      if (!enabled || !voiceOn || isMuted() || !supported) {
         animateMouth(c, performance.now() + dur);
-        c.timer = setTimeout(finish, isMuted() || !enabled ? Math.min(dur, 2500) : dur);
+        c.timer = setTimeout(finish, isMuted() || !enabled || !voiceOn ? Math.min(dur, 2500) : dur);
         return;
       }
       try {
@@ -145,6 +175,7 @@ export const voice = (() => {
   // Removes the global listeners (used on Vite HMR so reloads do not stack them).
   function dispose() {
     cancel();
+    clearTimeout(pollTimer);
     offMute();
     window.removeEventListener('pagehide', cancel);
     if (supported) synth.removeEventListener('voiceschanged', loadVoices);
@@ -152,6 +183,10 @@ export const voice = (() => {
 
   return {
     speak, cancel, enable, dispose, supported,
+    /** True when the browser reports at least one speech voice. */
+    available: () => supported && voices.length > 0,
+    setVoiceOn(on: boolean) { voiceOn = on; if (!on) cancel(); },
+    onVoices(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
     set onMouth(fn: ((who: Who, v: number) => void) | null) { mouthCb = fn || (() => {}); },
     describe: (who: Who) => { const v = pickVoice(who); return v ? v.name : 'default'; },
   };
