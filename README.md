@@ -58,3 +58,8 @@ scripts/playthrough.mjs         headless Playwright playthrough (see docs/TEST_R
 4. Prove you breathe
 5. Show me your heartbeat
 6. Final Challenge: Confess
+
+## Notes
+
+- Voices come from the browser/OS (SpeechSynthesis). Mortimer and Boo are told apart by voice name where available (Daniel/Samantha on Apple, David/Zira on Windows) and always by pitch and rate. On Linux or Android the default voice may be used for both, so the difference can be pitch only.
+- `npm run typecheck` runs `tsc` in strict mode. CI (`.github/workflows/ci.yml`) typechecks, builds and runs `scripts/playthrough.mjs` in all three modes.

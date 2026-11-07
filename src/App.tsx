@@ -31,7 +31,7 @@ export function App() {
     const s = createScene(canvasRef.current!);
     sceneRef.current = s;
     setWebgl(s.ok);
-    voice.onMouth = (who, v) => { s.mouth(who, v); fbRef.current?.mouth(who as Who, v); };
+    voice.onMouth = (who, v) => { s.mouth(who, v); fbRef.current?.mouth(who, v); };
     const unlock = () => sfx.unlock();
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);

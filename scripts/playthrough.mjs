@@ -2,14 +2,17 @@
 // Usage (needs playwright installed somewhere resolvable, not a project dependency):
 //   npm run build && node scripts/playthrough.mjs
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const url = pathToFileURL(path.join(root, 'dist/index.html')).href;
-const shots = path.join(root, 'docs/screenshots');
+// Screenshots go to a gitignored folder; copy a handful into docs/screenshots by hand.
+const shots = path.join(root, '.playthrough-shots');
 const mode = process.argv[2] || 'desktop'; // desktop | mobile | nowebgl
 
+fs.mkdirSync(shots, { recursive: true });
 const browser = await chromium.launch({
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
 });

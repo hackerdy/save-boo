@@ -17,7 +17,7 @@ Checks performed in every run:
 - Mute button toggles `localStorage.saveBooMuted` and `aria-pressed`
 - Subtitles are visible on every screenshot
 
-Screenshots are in `docs/screenshots/` (`desktop-*`, `mobile-*`, `nowebgl-*`).
+The playthrough writes all 30 screenshots to the gitignored `.playthrough-shots/`. Five representative ones are committed in `docs/screenshots/` (desktop intro, angry fail, finale burst; mobile pass; no-WebGL fallback).
 
 ## Limitations
 

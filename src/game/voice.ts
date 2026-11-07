@@ -1,17 +1,24 @@
 import { sfx } from './sfx';
+import type { Who } from '../types';
+
 // Voice overs via the browser SpeechSynthesis API (no audio files, no network).
 // Mortimer: low, slow, creaky. Boo: high, fast, squeaky.
-// Subtitles are handled by game.js, so everything still works with no speech support.
+// Subtitles are rendered by App.tsx from the same say() call, so everything still
+// works (with a timed mouth animation) when speech is unsupported, blocked or muted.
+// The actual voice depends on what the host OS provides; see the README.
+interface Profile { pitch: number; rate: number; volume: number; prefer: RegExp[] }
+interface Current { who: Who; resolve: () => void; timer: ReturnType<typeof setTimeout> | undefined; raf: number; accent: number }
+
 export const voice = (() => {
   const synth = window.speechSynthesis;
   const supported = !!(synth && window.SpeechSynthesisUtterance);
   let enabled = false;      // becomes true after the Begin click (user gesture)
-  let voices = [];
-  let current: any = null;       // { who, timer, resolve, raf }
-  let mouthCb: (who: string, v: number) => void = () => {};
+  let voices: SpeechSynthesisVoice[] = [];
+  let current: Current | null = null;
+  let mouthCb: (who: Who, v: number) => void = () => {};
   let token = 0;
 
-  const PROFILES = {
+  const PROFILES: Record<Who, Profile> = {
     grand: {
       pitch: 0.35, rate: 0.82, volume: 1,
       prefer: [/daniel/i, /george/i, /ryan/i, /google uk english male/i, /alex/i, /fred/i, /male/i, /david/i, /mark/i],
@@ -25,10 +32,10 @@ export const voice = (() => {
   const loadVoices = () => { if (supported) voices = synth.getVoices() || []; };
   if (supported) {
     loadVoices();
-    if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices);
+    synth.addEventListener('voiceschanged', loadVoices);
   }
 
-  function pickVoice(who) {
+  function pickVoice(who: Who): SpeechSynthesisVoice | null {
     const en = voices.filter((v) => /^en[-_]/i.test(v.lang) || /^en$/i.test(v.lang));
     const pool = en.length ? en : voices;
     for (const re of PROFILES[who].prefer) {
@@ -58,12 +65,12 @@ export const voice = (() => {
 
   // Estimated speaking time, used to drive the mouth and to resolve the promise
   // when speech is muted, unsupported, or never fires events.
-  const estimate = (text, who) => Math.max(900, (text.length * 62) / PROFILES[who].rate);
+  const estimate = (text: string, who: Who) => Math.max(900, (text.length * 62) / PROFILES[who].rate);
 
   // Animate the mouth until `until` (timestamp). Boundary events add extra accents.
-  function animateMouth(c, until) {
+  function animateMouth(c: Current, until: number) {
     const t0 = performance.now();
-    const loop = (now) => {
+    const loop = (now: number) => {
       if (current !== c) return;
       if (now > until) return;
       const t = (now - t0) / 1000;
@@ -76,12 +83,12 @@ export const voice = (() => {
   }
 
   // Returns a promise that resolves when the line is finished or cancelled.
-  function speak(who, text) {
+  function speak(who: Who, text: string) {
     cancel();
     const my = token;
     return new Promise<void>((resolve) => {
       const dur = estimate(text, who);
-      const c = { who, resolve, timer: 0, raf: 0, accent: 0 };
+      const c: Current = { who, resolve, timer: undefined, raf: 0, accent: 0 };
       current = c;
       const finish = () => { if (current === c) stopCurrent(); else resolve(); };
 
@@ -106,7 +113,7 @@ export const voice = (() => {
         };
         u.onboundary = () => { c.accent = 0.5; };
         u.onend = finish;
-        u.onerror = (ev: any) => {
+        u.onerror = (ev: SpeechSynthesisErrorEvent) => {
           if (ev && (ev.error === 'canceled' || ev.error === 'interrupted')) return finish();
           // Speech failed (no voices, blocked): keep the subtitle up for a readable time.
           clearTimeout(c.timer);
@@ -132,12 +139,22 @@ export const voice = (() => {
 
   function enable() { enabled = true; loadVoices(); }
 
-  sfx.onMuteChange((m) => { if (m) cancel(); });
+  const offMute = sfx.onMuteChange((m) => { if (m) cancel(); });
   window.addEventListener('pagehide', cancel);
 
+  // Removes the global listeners (used on Vite HMR so reloads do not stack them).
+  function dispose() {
+    cancel();
+    offMute();
+    window.removeEventListener('pagehide', cancel);
+    if (supported) synth.removeEventListener('voiceschanged', loadVoices);
+  }
+
   return {
-    speak, cancel, enable, supported,
-    set onMouth(fn) { mouthCb = fn || (() => {}); },
-    describe: (who) => { const v = pickVoice(who); return v ? v.name : 'default'; },
+    speak, cancel, enable, dispose, supported,
+    set onMouth(fn: ((who: Who, v: number) => void) | null) { mouthCb = fn || (() => {}); },
+    describe: (who: Who) => { const v = pickVoice(who); return v ? v.name : 'default'; },
   };
 })();
+
+if (import.meta.hot) import.meta.hot.dispose(() => voice.dispose());

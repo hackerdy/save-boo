@@ -1,14 +1,29 @@
-// 3D night graveyard for Save Boo, built on vendored three.js (global THREE, r149).
-// Exposes window.scene3d. If WebGL is not available, scene3d.ok is false and the
-// original SVG/DOM stage is used instead.
+// 3D night graveyard for Save Boo, built on three.js (imported from npm).
+// createScene(canvas) returns a SceneApi that React drives (progress, mood, mouths,
+// camera, finale). If WebGL is not available it returns a no-op API with ok = false
+// and App.tsx renders the DOM/emoji FallbackStage instead.
 import * as THREE from 'three';
+import type { Who } from '../types';
+
+type Mood = 'happy' | 'angry' | 'neutral';
+interface GhostOpts { scale: number; color: number; emissive: number; glowColor: number; boo: boolean }
+interface Ghost {
+  root: THREE.Group;
+  body: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+  mouth: THREE.Mesh;
+  eyes: THREE.Mesh[];
+  arms: THREE.Mesh[];
+  glow: THREE.Sprite;
+  light: THREE.PointLight;
+  brows: THREE.Mesh[];
+}
 
 export interface SceneApi {
   ok: boolean;
   setProgress(p: number): void;
-  mood(m: string): void;
+  mood(m: Mood): void;
   shake(): void;
-  mouth(who: string, v: number): void;
+  mouth(who: Who, v: number): void;
   cam(i: number): void;
   punch(): void;
   pass(): void;
@@ -42,12 +57,12 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 80);
   const clock = new THREE.Clock();
-  const rnd = (a, b) => Math.random() * (b - a) + a;
+  const rnd = (a: number, b: number) => Math.random() * (b - a) + a;
 
   /* ---------- textures ---------- */
-  function radialTex(inner, outer) {
+  function radialTex(inner: string, outer: string) {
     const c = document.createElement('canvas'); c.width = c.height = 128;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d')!;
     const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, inner); gr.addColorStop(1, outer);
     g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
@@ -89,7 +104,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   scene.add(ground);
 
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6b6b85, roughness: 0.9 });
-  function gravestone(x, z, s, ry) {
+  function gravestone(x: number, z: number, s: number, ry: number) {
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.25), stoneMat);
     base.position.y = 0.55;
@@ -107,7 +122,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   // dead trees
   const barkMat = new THREE.MeshStandardMaterial({ color: 0x241a2a, roughness: 1 });
-  function tree(x, z, h) {
+  function tree(x: number, z: number, h: number) {
     const g = new THREE.Group();
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, h, 7), barkMat);
     trunk.position.y = h / 2; g.add(trunk);
@@ -130,8 +145,8 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   }
 
   // jack-o-lanterns with flickering light
-  const pumpkins = [];
-  function pumpkin(x, z, s) {
+  const pumpkins: THREE.PointLight[] = [];
+  function pumpkin(x: number, z: number, s: number) {
     const g = new THREE.Group();
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshStandardMaterial({ color: 0xff7a1a, emissive: 0xff4a00, emissiveIntensity: 0.35, roughness: 0.7 }));
     m.scale.set(1.15, 0.9, 1.15); m.position.y = 0.45; g.add(m);
@@ -148,7 +163,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   /* ---------- particles ---------- */
   const FF = 70;
-  const ffPos = new Float32Array(FF * 3), ffSeed = [];
+  const ffPos = new Float32Array(FF * 3), ffSeed: Array<[number, number, number]> = [];
   for (let i = 0; i < FF; i++) {
     ffPos.set([rnd(-9, 9), rnd(0.3, 4), rnd(-9, 4)], i * 3);
     ffSeed.push([rnd(0, 6.28), rnd(0.3, 1), rnd(0.3, 1)]);
@@ -157,7 +172,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   const fireflies = new THREE.Points(ffGeo, new THREE.PointsMaterial({ map: glowTex, color: 0xcfff7a, size: 0.35, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   scene.add(fireflies);
 
-  const mists = [];
+  const mists: THREE.Sprite[] = [];
   for (let i = 0; i < 9; i++) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, depthWrite: false, opacity: rnd(0.35, 0.7) }));
     s.scale.set(rnd(6, 10), rnd(1.5, 2.5), 1); s.position.set(rnd(-10, 10), rnd(0.3, 1), rnd(-10, 3));
@@ -165,7 +180,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
   }
 
   /* ---------- ghosts ---------- */
-  function ghostBody(w, h, color, emissive) {
+  function ghostBody(w: number, h: number, color: number, emissive: number) {
     const geo = new THREE.SphereGeometry(1, 28, 20);
     const p = (geo.attributes.position as THREE.BufferAttribute);
     for (let i = 0; i < p.count; i++) {
@@ -182,12 +197,12 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     return new THREE.Mesh(geo, mat);
   }
 
-  function makeGhost({ scale, color, emissive, glowColor, boo }) {
+  function makeGhost({ scale, color, emissive, glowColor, boo }: GhostOpts): Ghost {
     const root = new THREE.Group();
     const body = ghostBody(boo ? 1.05 : 0.9, boo ? 0.95 : 1, color, emissive);
     root.add(body);
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0c0a14 });
-    const eyes = [];
+    const eyes: THREE.Mesh[] = [];
     const ex = boo ? 0.36 : 0.3, ey = boo ? 0.12 : 0.28, er = boo ? 0.17 : 0.1;
     [-1, 1].forEach((s) => {
       const e = new THREE.Mesh(new THREE.SphereGeometry(er, 12, 10), eyeMat);
@@ -219,7 +234,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
     root.scale.setScalar(scale);
     scene.add(root);
-    return { root, body, mouth, eyes, arms, glow, light, brows: [], hat: null };
+    return { root, body, mouth, eyes, arms, glow, light, brows: [] };
   }
 
   const boo = makeGhost({ scale: 0.8, color: 0xffffff, emissive: 0xffa0c8, glowColor: 0xff9ac4, boo: true });
@@ -251,7 +266,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   /* ---------- finale burst ---------- */
   const BN = 220;
-  const bPos = new Float32Array(BN * 3), bVel = [];
+  const bPos = new Float32Array(BN * 3), bVel: THREE.Vector3[] = [];
   for (let i = 0; i < BN; i++) bVel.push(new THREE.Vector3());
   const bGeo = new THREE.BufferGeometry(); bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
   const bMat = new THREE.PointsMaterial({ map: glowTex, color: 0xffd0e6, size: 0.5, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
@@ -261,10 +276,10 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   /* ---------- state ---------- */
   const st = {
-    progress: 0, target: 0, mood: 'neutral', shake: 0, punch: 0, pass: 0, finale: 0,
-    mouth: { grand: 0, boo: 0 }, angry: 0, camIdx: 0, hop: 0,
+    progress: 0, target: 0, mood: 'neutral' as Mood, shake: 0, punch: 0, pass: 0, finale: 0,
+    mouth: { grand: 0, boo: 0 } as Record<Who, number>, angry: 0, camIdx: 0, hop: 0,
   };
-  const CAMS = [
+  const CAMS: Array<[[number, number, number], [number, number, number]]> = [
     // pos, look
     [[0, 2.6, 9.5], [0, 1.2, 0]],      // intro
     [[2.2, 2.8, 7.2], [1.2, 1.9, 0]],  // 1 checkbox: focus Mortimer
@@ -293,18 +308,20 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
   // Gentle pointer parallax (works for mouse and touch drag)
   let px = 0, py = 0;
-  window.addEventListener('pointermove', (e) => {
+  const onPointer = (e: PointerEvent) => {
     px = (e.clientX / window.innerWidth - 0.5) * 2;
     py = (e.clientY / window.innerHeight - 0.5) * 2;
-  }, { passive: true });
+  };
+  window.addEventListener('pointermove', onPointer, { passive: true });
 
   /* ---------- loop ---------- */
-  let running = true, disposed = false;
-  document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) clock.getDelta(); });
+  let running = true, disposed = false, raf = 0;
+  const onVisibility = () => { running = !document.hidden; if (running) clock.getDelta(); };
+  document.addEventListener('visibilitychange', onVisibility);
 
   function frame() {
     if (disposed) return;
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
     if (!running) return;
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
 
@@ -347,7 +364,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     mort.arms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * (0.7 + (happy ? 0.8 : 0) + angry * 0.5 + Math.sin(t * 2 + i) * 0.1); });
 
     // mouths (open amount from voice, plus mood shape when silent)
-    ([[mort, 'grand'], [boo, 'boo']] as Array<[typeof mort, string]>).forEach(([g, who]) => {
+    ([[mort, 'grand'], [boo, 'boo']] as Array<[Ghost, Who]>).forEach(([g, who]) => {
       const m = g.mouth, o = st.mouth[who];
       const mood = who === 'grand' ? (happy ? 0.05 : 0) : 0.02 + st.finale * 0.06;
       m.scale.set(m.userData.w * (1 + o * 0.25), m.userData.base + mood + o * (who === 'boo' ? 0.16 : 0.2), 0.05);
@@ -398,16 +415,16 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
 
     renderer.render(scene, camera);
   }
-  requestAnimationFrame(frame);
+  raf = requestAnimationFrame(frame);
 
   /* ---------- API ---------- */
   Object.assign(api, {
     ok: true,
-    setProgress(p) { st.target = Math.max(0, Math.min(1, p)); },
-    mood(m) { st.mood = m; if (m === 'angry') st.angry = 1; },
+    setProgress(p: number) { st.target = Math.max(0, Math.min(1, p)); },
+    mood(m: Mood) { st.mood = m; if (m === 'angry') st.angry = 1; },
     shake() { st.shake = 1; st.punch = Math.max(st.punch, 0.8); st.angry = Math.max(st.angry, 0.6); },
-    mouth(who, v) { st.mouth[who] = v; },
-    cam(i) { st.camIdx = Math.max(0, Math.min(CAMS.length - 1, i)); },
+    mouth(who: Who, v: number) { st.mouth[who] = v; },
+    cam(i: number) { st.camIdx = Math.max(0, Math.min(CAMS.length - 1, i)); },
     punch() { st.punch = 1; },
     pass() { st.pass = 1; st.hop = 1; },
     reset() { st.finale = 0; st.camIdx = 0; st.target = 0; burstT = -1; flash.intensity = 0; bMat.opacity = 0; (scene.background as THREE.Color).setRGB(0.04, 0.03, 0.13); },
@@ -425,6 +442,18 @@ export function createScene(canvas: HTMLCanvasElement): SceneApi {
     running = false; disposed = true;
     window.removeEventListener('resize', resize);
     window.removeEventListener('orientationchange', resize);
+    window.removeEventListener('pointermove', onPointer);
+    document.removeEventListener('visibilitychange', onVisibility);
+    cancelAnimationFrame(raf);
+    // Free GPU resources: geometries, materials and their textures.
+    const mats = new Set<THREE.Material>();
+    scene.traverse((o) => {
+      const obj = o as THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
+      obj.geometry?.dispose();
+      if (obj.material) (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach((m) => mats.add(m));
+    });
+    mats.forEach((m) => m.dispose());
+    glowTex.dispose(); mistTex.dispose();
     renderer.dispose();
   };
   canvas.dataset.ready = '1';
