@@ -32,7 +32,7 @@ const build = (): Settings => ({
   largeCaptions: false,
   lowPower: false,
   haptics: true,
-  aiEnabled: true,
+  aiEnabled: false,   // opt-in: no third-party requests until the player agrees
   aiRoast: true,
   aiBase: '',
   aiModel: '',

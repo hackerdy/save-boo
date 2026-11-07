@@ -9,7 +9,7 @@ Environment: headless Chromium 131 (Playwright 1.49.1) with SwiftShader software
 | nowebgl | WebGL forced off | Fallback stage used, fully playable, 0 errors |
 | keyboard | Keyboard only, `prefers-reduced-motion` emulated | Reduced motion applied, runaway checkbox does not move, full run by keys, 0 errors |
 | desktop `PLAY_AI=mock` | Endpoint returns canned lines | Canned lines reach the subtitles, verdict shown, confession sent only for its reaction, 0 errors |
-| desktop `PLAY_AI=off` | AI toggle off | Zero AI requests, 0 errors |
+| desktop `PLAY_AI=off` | AI default (opt-in, off); gear opens Settings, AI switch toggled on then off, Escape closes | Zero AI requests, 0 errors |
 
 Checks performed in every run:
 

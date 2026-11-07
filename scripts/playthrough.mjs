@@ -43,7 +43,8 @@ await page.route(/text\.pollinations\.ai/, (route) => {
   }
   return route.abort('failed');
 });
-if (aiMode === 'off') await page.addInitScript(() => localStorage.setItem('saveBooSettings', JSON.stringify({ aiEnabled: false })));
+// AI is opt-in. mock/block runs seed an earlier opt-in; off leaves the default and checks it through the UI.
+if (aiMode !== 'off') await page.addInitScript(() => { if (!localStorage.getItem('saveBooSettings')) localStorage.setItem('saveBooSettings', JSON.stringify({ aiEnabled: true })); });
 await page.addInitScript(() => {
   window.__subs = [];
   const watch = () => {
@@ -71,9 +72,20 @@ if (kb) {
 }
 await shot('01-intro');
 
+// Settings via the gear: opens, Escape closes, keyboard skip still works afterwards
+await page.click('#settingsBtn', { force: true }); // force: the floating ghost stage keeps layout moving
+await page.waitForSelector('[role=dialog][aria-label=Settings]');
+if (aiMode === 'off') {
+  if (await page.isChecked('#setAi')) errors.push('AI should default to off');
+  await page.check('#setAi'); await page.uncheck('#setAi');     // toggle on then off through the UI
+}
+if (!(await page.isChecked('#setAi')) === (aiMode !== 'off')) errors.push('AI switch state wrong for mode ' + aiMode);
+if (aiMode === 'off') log('AI status text:', await page.textContent('#aiStatus'));
+await page.keyboard.press('Escape');
+if (await page.$('[role=dialog][aria-label=Settings]')) errors.push('settings did not close on Escape');
 // Intro choices exist and work
-await page.click('#voiceChoice'); await page.click('#voiceChoice');
-if (kb) { await page.focus('#begin'); await page.keyboard.press('Enter'); } else { await page.click('#begin'); }
+await page.click('#voiceChoice', { force: true }); await page.click('#voiceChoice', { force: true });
+if (kb) { await page.focus('#begin'); await page.keyboard.press('Enter'); } else { await page.click('#begin', { force: true }); }
 await page.waitForSelector('.skip', { timeout: 3000 }).catch(() => {});
 await shot('02-greeting');
 if (kb) { await page.keyboard.press('Escape'); } else { await page.click('.skip').catch(() => {}); }

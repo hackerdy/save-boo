@@ -34,7 +34,7 @@ export function SettingsPanel({ muted, onMute, voiceNote, onClose }: Props) {
         {s.aiEnabled && (
           <details>
             <summary>Use my own AI endpoint (optional)</summary>
-            <p className="hint">Any OpenAI-compatible chat completions API. Saved only in this browser (localStorage), never uploaded or committed. https only.</p>
+            <p className="hint">Any OpenAI-compatible chat completions API. Saved only in this browser (localStorage), never uploaded or committed. https only. Warning: the key is sent to whatever host you type here, so only use a service you trust.</p>
             <label htmlFor="aiBase">Base URL</label>
             <input id="aiBase" type="text" inputMode="url" autoComplete="off" placeholder={DEFAULT_BASE} value={s.aiBase} onChange={(e) => settings.set({ aiBase: e.target.value.trim() })} />
             <label htmlFor="aiModel">Model</label>

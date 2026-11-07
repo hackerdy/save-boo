@@ -18,7 +18,7 @@ const IDLE_MS = 15000;      // Mortimer nudges after this long without input
 const ASSIST_FAILS = 4;     // mistakes on one challenge before the mercy button appears
 
 const FIRST_GREETING = pickLine('greeting');
-warm('greeting');                                    // start generating the live greeting while the intro shows
+if (settings.get().aiEnabled) warm('greeting');      // only for players who opted in to AI Mortimer
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -226,6 +226,13 @@ export function App() {
     setPhase('intro');
   };
 
+  // AI is opt-in: nothing is sent to the third-party service until the player turns it on.
+  const toggleAi = () => {
+    const on = !settings.get().aiEnabled;
+    settings.set({ aiEnabled: on });
+    if (on) warm('greeting');
+  };
+
   const toggleMute = () => {
     sfx.unlock();
     sfx.setMuted(!sfx.isMuted());
@@ -312,9 +319,10 @@ export function App() {
               <div className="row">
                 <button id="soundChoice" type="button" className="ghostbtn" aria-pressed={!muted} onClick={toggleMute}>Sound: {muted ? 'off' : 'on'}</button>
                 <button id="voiceChoice" type="button" className="ghostbtn" aria-pressed={set.voice} onClick={() => settings.set({ voice: !set.voice })}>Voice: {set.voice ? 'on' : 'off'}</button>
+                <button id="aiChoice" type="button" className="ghostbtn" aria-pressed={set.aiEnabled} onClick={toggleAi}>AI Mortimer: {set.aiEnabled ? 'on' : 'off'}</button>
               </div>
               <button id="begin" autoFocus onClick={begin}>Begin the Trials</button>
-              <p className="hint" id="voiceNote">{voiceNote || 'Headphones recommended, ghosts whisper. Press Escape to skip any voice line.'}</p>
+              <p className="hint" id="voiceNote">{voiceNote || 'Headphones recommended. Escape skips a voice line.'} AI Mortimer is optional and off by default. If on, trial name, mistakes and time go to a free third-party AI service.</p>
             </div>
           )}
           {phase === 'greeting' && <div className="center"><p className="lead">Mortimer is speaking... <span className="hint">(Space or Escape to skip)</span></p></div>}
@@ -334,6 +342,7 @@ export function App() {
           {phase === 'done' && <Results stats={results} verdict={verdict} onAgain={again} />}
         </section>
       </div>
+      {showSettings && <SettingsPanel muted={muted} onMute={toggleMute} voiceNote={voiceNote} onClose={() => setShowSettings(false)} />}
       {confetti > 0 && !set.reducedMotion && <Confetti key={confetti} />}
     </div>
   );
