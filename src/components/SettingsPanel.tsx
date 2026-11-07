@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { ai, DEFAULT_BASE, DEFAULT_MODEL } from '../game/ai';
 import { settings, useSettings } from '../game/settings';
 
@@ -7,10 +7,24 @@ interface Props { muted: boolean; onMute: () => void; voiceNote: string; onClose
 export function SettingsPanel({ muted, onMute, voiceNote, onClose }: Props) {
   const s = useSettings();
   const status = useSyncExternalStore(ai.subscribe, ai.status);
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const opener = document.activeElement as HTMLElement | null;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab' || !box.current) return;
+      const f = Array.from(box.current.querySelectorAll<HTMLElement>('input, button, summary, [tabindex]:not([tabindex="-1"])')).filter((el) => !(el as HTMLInputElement).disabled && el.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+      if (!box.current.contains(cur)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
+    return () => {
+      window.removeEventListener('keydown', k);
+      (opener && document.contains(opener) ? opener : document.getElementById('settingsBtn'))?.focus();
+    };
   }, [onClose]);
   const row = (id: string, label: string, on: boolean, toggle: () => void) => (
     <label className="setrow" htmlFor={id}>
@@ -20,7 +34,7 @@ export function SettingsPanel({ muted, onMute, voiceNote, onClose }: Props) {
   );
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Settings">
-      <div className="settings">
+      <div className="settings" ref={box}>
         <h2>Settings</h2>
         {row('setSound', 'Sound effects and voice', !muted, onMute)}
         {row('setVoice', 'Spoken voice (off = subtitles only)', s.voice, () => settings.set({ voice: !s.voice }))}

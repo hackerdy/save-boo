@@ -61,6 +61,7 @@ input[type=text], textarea { width: 100%; padding: 10px; border-radius: 8px; bor
 .fb-ghost { text-align: center; animation: float 3.5s ease-in-out infinite; }
 .fb-ghost small { display: block; font-size: 13px; opacity: .7; }
 @keyframes float { 50% { margin-top: -14px; } }
+@keyframes floatT { 50% { transform: translateY(-14px); } }
 
 @media (max-width: 700px) {
   .panel { max-height: 48vh; min-height: 160px; padding: 10px 12px; }
@@ -77,7 +78,7 @@ input[type=text], textarea { width: 100%; padding: 10px; border-radius: 8px; bor
 .ghostbtn { background: transparent; color: var(--text); border: 2px solid var(--accent2); }
 .ghostbtn[aria-pressed=false] { opacity: .75; }
 .intro-ghosts { font-size: 40px; display: flex; gap: 18px; justify-content: center; }
-.intro-ghosts span { display: inline-block; animation: float 3s ease-in-out infinite; }
+.intro-ghosts span { display: inline-block; animation: floatT 3s ease-in-out infinite; }
 .intro-ghosts span + span { animation-delay: -1.5s; }
 .boot { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .4; } }

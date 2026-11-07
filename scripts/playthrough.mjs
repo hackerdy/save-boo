@@ -73,8 +73,13 @@ if (kb) {
 await shot('01-intro');
 
 // Settings via the gear: opens, Escape closes, keyboard skip still works afterwards
-await page.click('#settingsBtn', { force: true }); // force: the floating ghost stage keeps layout moving
+await page.click('#settingsBtn');
 await page.waitForSelector('[role=dialog][aria-label=Settings]');
+// focus trap: Tab never leaves the dialog
+for (let i = 0; i < 30; i++) {
+  await page.keyboard.press('Tab');
+  if (!(await page.evaluate(() => !!document.activeElement.closest('[role=dialog]')))) errors.push('focus escaped settings dialog');
+}
 if (aiMode === 'off') {
   if (await page.isChecked('#setAi')) errors.push('AI should default to off');
   await page.check('#setAi'); await page.uncheck('#setAi');     // toggle on then off through the UI
@@ -84,8 +89,8 @@ if (aiMode === 'off') log('AI status text:', await page.textContent('#aiStatus')
 await page.keyboard.press('Escape');
 if (await page.$('[role=dialog][aria-label=Settings]')) errors.push('settings did not close on Escape');
 // Intro choices exist and work
-await page.click('#voiceChoice', { force: true }); await page.click('#voiceChoice', { force: true });
-if (kb) { await page.focus('#begin'); await page.keyboard.press('Enter'); } else { await page.click('#begin', { force: true }); }
+await page.click('#voiceChoice'); await page.click('#voiceChoice');
+if (kb) { await page.focus('#begin'); await page.keyboard.press('Enter'); } else { await page.click('#begin'); }
 await page.waitForSelector('.skip', { timeout: 3000 }).catch(() => {});
 await shot('02-greeting');
 if (kb) { await page.keyboard.press('Escape'); } else { await page.click('.skip').catch(() => {}); }
@@ -152,8 +157,8 @@ for (let n = 0; n < 6; n++) {
       if (kb) await page.keyboard.press('Enter'); else await page.evaluate(() => document.getElementById('tap').click());
       t += gap;
     }
-    if (kb) {} // focus stays on #tap (autoFocus)
-    } else if (id === 'secret') {
+    // kb: focus stays on #tap (autoFocus)
+  } else if (id === 'secret') {
     const text = 'I once waved back at someone who was waving at a person behind me.';
     if (kb) { await page.focus('#secret'); await page.keyboard.type(text); await page.focus('#confess'); await page.keyboard.press('Enter'); }
     else { await page.fill('#secret', text); await page.click('#confess'); }
