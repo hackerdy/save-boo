@@ -1,27 +1,29 @@
 # Test report
 
-Environment: headless Chromium 131 (Playwright 1.49) with SwiftShader software WebGL, loading `dist/index.html` over `file://`. Script: `scripts/playthrough.mjs` (`desktop`, `mobile`, `nowebgl` modes).
+Environment: headless Chromium 131 (Playwright 1.49.1) with SwiftShader software WebGL, loading `dist/index.html` over `file://`. Script: `scripts/playthrough.mjs`. Unit tests: `npm test` (vitest, 14 tests, all passing). Build: `dist/index.html` 629 KB, within the 1.5 MB CI budget.
 
-| Mode | Viewport | Result |
+| Run | Setup | Result |
 | --- | --- | --- |
-| desktop | 1280x760 | All six challenges plus finale and replay pass, 0 console errors or warnings |
-| mobile | 390x780 @2x, touch | Same, 0 console errors or warnings |
-| nowebgl | 1280x760, WebGL forced off | Fallback stage used, game fully playable, 0 errors |
+| desktop | 1280x760, AI endpoint blocked (scripted fallback) | All six trials, finale, results card, share and replay pass, 0 console errors or warnings |
+| mobile | 390x780 @2x, touch | Same, 0 errors |
+| nowebgl | WebGL forced off | Fallback stage used, fully playable, 0 errors |
+| keyboard | Keyboard only, `prefers-reduced-motion` emulated | Reduced motion applied, runaway checkbox does not move, full run by keys, 0 errors |
+| desktop `PLAY_AI=mock` | Endpoint returns canned lines | Canned lines reach the subtitles, verdict shown, confession sent only for its reaction, 0 errors |
+| desktop `PLAY_AI=off` | AI default (opt-in, off); gear opens Settings, AI switch toggled on then off, Escape closes | Zero AI requests, 0 errors |
 
 Checks performed in every run:
 
 - 3D canvas initialises (`#scene[data-ready]`), except in nowebgl where the fallback is expected
-- Runaway checkbox dodges 6 times, wrong grid answer triggers the angry reaction and camera punch, correct answers advance
-- Breathe (hold 2.8 s twice), heartbeat (5 steady taps) and confession (voiced analysis sequence) complete
-- Finale burst, Boo speaks, "Play again" resets the game
-- Mute button toggles `localStorage.saveBooMuted` and `aria-pressed`
-- Subtitles are visible on every screenshot
+- Challenge order starts with the runaway checkbox, ends with the confession, and uses all six trials once
+- Wrong answers trigger the angry reaction; correct answers advance
+- Breathe, heartbeat and confession trials complete
+- Finale, Humanity Rating card, share button and "Play again" reset
+- Mute toggles `localStorage.saveBooMuted` and `aria-pressed`
 
-The playthrough writes all 30 screenshots to the gitignored `.playthrough-shots/`. Five representative ones are committed in `docs/screenshots/` (desktop intro, angry fail, finale burst; mobile pass; no-WebGL fallback).
+The playthrough writes its screenshots to the gitignored `.playthrough-shots/`. Six are committed in `docs/screenshots/` (intro, trial, fail reaction, finale, results card, mobile) and used by the README.
 
 ## Limitations
 
-- Headless Chromium cannot play audio, so voice quality, pitch and voice selection were not heard. The speech path was exercised and falls back to timer-driven mouths and readable subtitle delays when no voice produces events. Please listen on a real device.
-- Emoji glyphs (speaker icon, tile characters) do not render in screenshots because the headless host has no emoji font. They render in normal browsers.
-- Mute for real audio output was verified by code path (`sfx` master gain and `voice.cancel`), not by listening.
-- The in-session Playwright tool blocks `file://`, so a separate Playwright install was used for the playthrough.
+- Headless Chromium cannot play audio, so voice quality, pitch and voice selection were not heard. The speech path falls back to timer-driven mouths and readable subtitle delays. Please listen on a real device.
+- Emoji glyphs do not render in screenshots because the headless host has no emoji font. They render in normal browsers.
+- The live AI endpoint is not called in tests (blocked or mocked) so results are deterministic. Real model output was not exercised in CI.

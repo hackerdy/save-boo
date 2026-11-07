@@ -1,10 +1,21 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers
+      # dist/index.html budget in bytes (single file, everything inlined)
+      SIZE_BUDGET: 1500000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -13,8 +24,34 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
-      - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
-      - run: |
-          for m in desktop mobile nowebgl; do node scripts/playthrough.mjs $m; done
+      - name: Bundle size budget
+        run: |
+          size=$(stat -c %s dist/index.html)
+          echo "dist/index.html: $size bytes ($((size / 1024)) KiB), budget $SIZE_BUDGET"
+          echo "### Bundle size" >> "$GITHUB_STEP_SUMMARY"
+          echo "dist/index.html: $((size / 1024)) KiB (budget $((SIZE_BUDGET / 1024)) KiB)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt "$SIZE_BUDGET" ]; then echo "Over budget"; exit 1; fi
+      - run: npm install --no-save playwright@1.49.1
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: .pw-browsers
+          key: pw-1.49.1-${{ runner.os }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: Playthroughs
+        run: |
+          for m in desktop mobile nowebgl keyboard; do node scripts/playthrough.mjs $m; done
+          for a in mock off; do PLAY_AI=$a node scripts/playthrough.mjs desktop; done
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playthrough-screenshots
+          path: .playthrough-shots/
+          if-no-files-found: ignore
