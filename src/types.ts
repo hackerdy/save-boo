@@ -1,3 +1,5 @@
+import type { PoolKey } from './game/lines';
+
 export type Who = 'grand' | 'boo';
 
 export interface ChallengeCtx {
@@ -9,6 +11,10 @@ export interface ChallengeCtx {
   mood: (m: 'happy' | 'angry' | 'neutral') => void;
   shake: () => void;
   pass: (msg: string) => void;
+  /** Line for a pool key: a ready live AI line when available, else the scripted pool. */
+  line: (key: PoolKey) => string;
+  /** AI reaction to the typed confession (null = use the scripted line). Respects the opt-outs. */
+  react: (text: string) => Promise<string | null>;
   /** 1-based position of this challenge in the current run, and the run length. */
   n: number;
   total: number;

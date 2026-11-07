@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../game/sfx';
 import { ChallengeCtx } from '../types';
 import { pickLine } from '../game/lines';
+import { settings, useSettings } from '../game/settings';
 
 type Props = { ctx: ChallengeCtx };
 const rand = (a: number, b: number) => Math.random() * (b - a) + a;
@@ -20,7 +21,7 @@ function Runaway({ ctx }: Props) {
   const cap = useRef<HTMLDivElement>(null);
   const count = useRef(0);
 
-  useEffect(() => { ctx.say(pickLine('intro_runaway')); }, []);
+  useEffect(() => { ctx.say(ctx.line('intro_runaway')); }, []);
 
   const react = () => {
     if (count.current >= need) return;
@@ -34,13 +35,13 @@ function Runaway({ ctx }: Props) {
       setPos({ left: rand(0, Math.max(0, r.width - w - 10)), top: rand(40, Math.max(41, r.height - h - 10)) });
     }
     ctx.shake();
-    if (n === Math.ceil(need / 2)) ctx.say(pickLine('nervous'));
-    if (n === need) { ctx.say(pickLine('giveUp')); ctx.mood('neutral'); }
+    if (n === Math.ceil(need / 2)) ctx.say(ctx.line('nervous'));
+    if (n === need) { ctx.say(ctx.line('giveUp')); ctx.mood('neutral'); }
   };
   const tick = () => {
     if (count.current < need || checked) return;
     setChecked(true);
-    ctx.pass(pickLine('passGeneric') + ' Ticking boxes: the most human thing there is.');
+    ctx.pass(ctx.line('passGeneric') + ' Ticking boxes: the most human thing there is.');
   };
 
   return (
@@ -82,13 +83,13 @@ function Grid({ ctx }: Props) {
     return shuffle(t);
   }, [variant]);
   const [sel, setSel] = useState<Set<number>>(new Set());
-  useEffect(() => { ctx.say(pickLine('intro_grid')); }, []);
+  useEffect(() => { ctx.say(ctx.line('intro_grid')); }, []);
 
   const toggle = (i: number) => setSel((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   const verify = () => {
     const target = new Set(tiles.map((t, i) => (variant.targets.includes(t) ? i : -1)).filter((i) => i >= 0));
     const ok = sel.size === target.size && [...sel].every((i) => target.has(i));
-    if (ok) return ctx.pass(pickLine('passGeneric') + " I was SURE you'd pick the zombie.");
+    if (ok) return ctx.pass(ctx.line('passGeneric') + " I was SURE you'd pick the zombie.");
     ctx.fail(pickLine('gridWrong'));
   };
   return (
@@ -109,9 +110,9 @@ function Grid({ ctx }: Props) {
 function CursedText({ ctx }: Props) {
   const word = useMemo(() => pick(['BOOKEEPER', 'SPOOKY', 'CANDLES', 'COBWEB', 'PUMPKIN', 'WITCHES', 'MIDNIGHT', 'GRAVEYARD', 'LANTERN', 'SKELETON']), []);
   const [val, setVal] = useState('');
-  useEffect(() => { ctx.say(pickLine('intro_text')); }, []);
+  useEffect(() => { ctx.say(ctx.line('intro_text')); }, []);
   const submit = () => {
-    if (val.trim().toUpperCase() === word) return ctx.pass(pickLine('passGeneric') + ' You can read! Humans love reading.');
+    if (val.trim().toUpperCase() === word) return ctx.pass(ctx.line('passGeneric') + ' You can read! Humans love reading.');
     ctx.fail(pickLine('textWrong'));
     setVal('');
   };
@@ -134,7 +135,7 @@ function Breathe({ ctx }: Props) {
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState('Hold the button (or Space) to INHALE.');
   const hold = useRef(0), full = useRef(false), cycles = useRef(0), raf = useRef(0);
-  useEffect(() => { ctx.say(pickLine('intro_breathe')); }, []);
+  useEffect(() => { ctx.say(ctx.line('intro_breathe')); }, []);
 
   // Gentle curve: each mistake shortens the required inhale a little (2.5s down to 1.6s).
   const holdMs = () => 2500 - Math.min(ctx.fails(), 3) * 300;
@@ -159,7 +160,7 @@ function Breathe({ ctx }: Props) {
     if (full.current) {
       sfx.play('exhale');
       cycles.current++;
-      if (cycles.current >= need) return ctx.pass(pickLine('passGeneric') + ' Oxygen detected. Suspicious, but acceptable.');
+      if (cycles.current >= need) return ctx.pass(ctx.line('passGeneric') + ' Oxygen detected. Suspicious, but acceptable.');
       setMsg(`Good. ${need - cycles.current} more breath to go.`);
     } else {
       setMsg('Too short! That was a hiccup, not a breath.');
@@ -201,7 +202,7 @@ function Heart({ ctx }: Props) {
   const taps = useRef<number[]>([]);
   const [msg, setMsg] = useState(variant.prompt);
   const [beat, setBeat] = useState(false);
-  useEffect(() => { ctx.say(pickLine('intro_heart') + (variant.id === 'any' ? '' : ' ' + variant.prompt)); }, []);
+  useEffect(() => { ctx.say(ctx.line('intro_heart') + (variant.id === 'any' ? '' : ' ' + variant.prompt)); }, []);
   const tap = () => {
     sfx.play('thump');
     const now = performance.now();
@@ -218,7 +219,7 @@ function Heart({ ctx }: Props) {
     const steady = gaps.every((g) => Math.abs(g - avg) / avg < tol);
     const bpm = Math.round(60000 / avg);
     taps.current = [];
-    if (steady && bpm >= variant.min && bpm <= variant.max) return ctx.pass(`${bpm} BPM. ${pickLine('passGeneric')} A real human heart! Gross. Beautiful.`);
+    if (steady && bpm >= variant.min && bpm <= variant.max) return ctx.pass(`${bpm} BPM. ${ctx.line('passGeneric')} A real human heart! Gross. Beautiful.`);
     if (!steady) { setMsg('That rhythm is all over the place. Try again.'); return ctx.fail(pickLine('heartMessy')); }
     setMsg(`${bpm} BPM. Needed ${variant.min} to ${variant.max}. Try again.`);
     ctx.fail(pickLine(bpm > variant.max ? 'heartFast' : 'heartSlow'));
@@ -244,15 +245,18 @@ function Secret({ ctx }: Props) {
   const prompt = useMemo(() => pick(SECRET_PROMPTS), []);
   const [v, setV] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { ctx.say(pickLine('intro_secret')); }, []);
+  const set = useSettings();
+  useEffect(() => { ctx.say(ctx.line('intro_secret')); }, []);
   const confess = async () => {
     const s = v.trim();
     if (busy) return;
     if (s.length < 20) { ctx.fail(pickLine('secretShort')); return; }
     setBusy(true);
+    const reaction = ctx.react(s);                  // runs while Mortimer pretends to analyze
     await ctx.say(pickLine('secretAnalyze'));
     await sleep(300);
-    await ctx.say(`"${s.slice(0, 40)}${s.length > 40 ? '...' : ''}" ${pickLine('secretReact')}`);
+    const live = await reaction;
+    await ctx.say(live ?? `"${s.slice(0, 40)}${s.length > 40 ? '...' : ''}" ${pickLine('secretReact')}`);
     await sleep(300);
     ctx.pass('SO. HUMAN.');
   };
@@ -261,6 +265,12 @@ function Secret({ ctx }: Props) {
       <h2>{heading(ctx, 'Confess')}</h2>
       <textarea id="secret" rows={4} placeholder={prompt} aria-label={prompt} autoFocus value={v} onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) confess(); }} />
+      {set.aiEnabled && (
+        <label className="setrow ainote" htmlFor="aiRoast">
+          <span>Let AI Mortimer react to this. Only the text you type here is sent to a third-party AI service.</span>
+          <input id="aiRoast" type="checkbox" checked={set.aiRoast} onChange={() => settings.set({ aiRoast: !set.aiRoast })} />
+        </label>
+      )}
       <p className="center"><button id="confess" disabled={busy} onClick={confess}>CONFESS</button></p>
     </div>
   );

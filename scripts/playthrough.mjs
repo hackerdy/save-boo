@@ -13,6 +13,9 @@ const url = pathToFileURL(path.join(root, 'dist/index.html')).href;
 const shots = path.join(root, '.playthrough-shots');
 const mode = process.argv[2] || 'desktop'; // desktop | mobile | nowebgl | keyboard
 const kb = mode === 'keyboard';
+// AI Mortimer network mode (env PLAY_AI): block (default, endpoint unreachable -> scripted fallback),
+// mock (endpoint returns canned lines that must show up in subtitles), off (AI toggle off, zero requests).
+const aiMode = process.env.PLAY_AI || 'block';
 
 fs.mkdirSync(shots, { recursive: true });
 const browser = await chromium.launch({
@@ -23,8 +26,33 @@ const ctx = await browser.newContext(mode === 'mobile'
   : { viewport: { width: 1280, height: 760 }, ...(kb ? { reducedMotion: 'reduce' } : {}) });
 const page = await ctx.newPage();
 const errors = [];
-page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`); });
+page.on('console', (m) => {
+  // A blocked AI endpoint logs a failed resource load by design; the game must fall back silently.
+  if (aiMode === 'block' && /Failed to load resource/.test(m.text())) return;
+  if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`);
+});
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+let aiRequests = 0, aiBodies = [];
+await page.route(/text\.pollinations\.ai/, (route) => {
+  aiRequests++;
+  aiBodies.push(route.request().postData() || '');
+  if (aiMode === 'mock') {
+    const content = `Canned AI line number ${aiRequests}, brought to you by the mocked ghost network.`;
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ choices: [{ message: { content, reasoning: 'ignored' } }] }) });
+  }
+  return route.abort('failed');
+});
+if (aiMode === 'off') await page.addInitScript(() => localStorage.setItem('saveBooSettings', JSON.stringify({ aiEnabled: false })));
+await page.addInitScript(() => {
+  window.__subs = [];
+  const watch = () => {
+    const el = document.getElementById('speech');
+    if (!el) return setTimeout(watch, 50);
+    new MutationObserver(() => window.__subs.push(el.innerText)).observe(el, { childList: true, subtree: true, characterData: true });
+  };
+  watch();
+});
 if (mode === 'nowebgl') {
   await page.addInitScript(() => {
     const orig = HTMLCanvasElement.prototype.getContext;
@@ -146,6 +174,17 @@ log('muted flag:', await page.evaluate(() => localStorage.getItem('saveBooMuted'
 await page.click('#muteBtn');
 log('unmuted flag:', await page.evaluate(() => localStorage.getItem('saveBooMuted')));
 
+const subs = await page.evaluate(() => window.__subs);
+const canned = subs.filter((t) => /Canned AI line/.test(t)).length;
+log(`AI mode ${aiMode}: ${aiRequests} request(s), ${canned} canned subtitle update(s)`);
+if (aiMode === 'mock') {
+  if (!canned) errors.push('mocked AI line never reached the subtitles');
+  if (!(await page.$('#verdict'))) errors.push('AI verdict missing on results card');
+  if (!aiBodies.some((b) => b.includes('I once waved back'))) errors.push('confession text was not sent for the AI reaction');
+  if (aiBodies.some((b) => !b.includes('I once waved back') && b.includes('waving at a person'))) errors.push('typed text leaked into a non-confession request');
+}
+if (aiMode === 'off' && aiRequests) errors.push('AI toggle off but requests were made: ' + aiRequests);
+if (aiMode === 'block' && canned) errors.push('canned lines appeared while the AI endpoint was blocked');
 await page.click('#again');
 await page.waitForSelector('#begin');
 log('replay reset ok');

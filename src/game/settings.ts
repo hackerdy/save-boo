@@ -7,6 +7,14 @@ export interface Settings {
   largeCaptions: boolean;
   lowPower: boolean;
   haptics: boolean;
+  /** AI Mortimer: live generated lines (default on). Off = scripted lines only, zero AI network calls. */
+  aiEnabled: boolean;
+  /** Send the typed confession text to the AI for a reaction (default on, opt-out in the challenge). */
+  aiRoast: boolean;
+  /** Optional bring-your-own OpenAI-compatible endpoint. Stored only in this browser's localStorage. */
+  aiBase: string;
+  aiModel: string;
+  aiKey: string;
 }
 
 const KEY = 'saveBooSettings';
@@ -24,6 +32,11 @@ const build = (): Settings => ({
   largeCaptions: false,
   lowPower: false,
   haptics: true,
+  aiEnabled: true,
+  aiRoast: true,
+  aiBase: '',
+  aiModel: '',
+  aiKey: '',
   ...stored,
 });
 

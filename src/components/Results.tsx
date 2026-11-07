@@ -17,7 +17,7 @@ export function rate(s: RunStats): { title: string; pct: number } {
 
 const fmt = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')}`;
 
-export function Results({ stats, onAgain }: { stats: RunStats; onAgain: () => void }) {
+export function Results({ stats, verdict, onAgain }: { stats: RunStats; verdict?: string; onAgain: () => void }) {
   const { title, pct } = rate(stats);
   const [note, setNote] = useState('');
   const link = /^https?:/.test(location.protocol) ? ` ${location.origin}${location.pathname}` : '';
@@ -38,6 +38,7 @@ export function Results({ stats, onAgain }: { stats: RunStats; onAgain: () => vo
       <p className="big" aria-hidden="true">🎉👻🎉</p>
       <h2 id="rating">Humanity Rating: {pct}%</h2>
       <p className="title" id="ratingTitle">{title}</p>
+      {verdict && <p className="verdict" id="verdict">Mortimer says: {verdict}</p>}
       <ul className="stats" aria-label="Run stats">
         <li><b>{fmt(stats.secs)}</b><span>time</span></li>
         <li><b>{stats.mistakes}</b><span>mistakes</span></li>

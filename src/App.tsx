@@ -6,9 +6,10 @@ import { makeRun, TOTAL } from './challenges/Challenges';
 import { ChallengeCtx, Who } from './types';
 import { Confetti } from './components/Confetti';
 import { FallbackStage } from './components/FallbackStage';
-import { Results, RunStats } from './components/Results';
+import { rate, Results, RunStats } from './components/Results';
 import { SettingsPanel } from './components/SettingsPanel';
-import { pickLine } from './game/lines';
+import { pickLine, PoolKey } from './game/lines';
+import { ai, AiContext, line, liveLine, warm } from './game/ai';
 import { haptic, settings, useSettings } from './game/settings';
 
 type Phase = 'intro' | 'greeting' | 'trial' | 'passed' | 'finale' | 'done';
@@ -17,6 +18,7 @@ const IDLE_MS = 15000;      // Mortimer nudges after this long without input
 const ASSIST_FAILS = 4;     // mistakes on one challenge before the mercy button appears
 
 const FIRST_GREETING = pickLine('greeting');
+warm('greeting');                                    // start generating the live greeting while the intro shows
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,6 +36,7 @@ export function App() {
   const [bloom, setBloom] = useState(false);
   const [assist, setAssist] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [verdict, setVerdict] = useState('');
   const [results, setResults] = useState<RunStats>({ secs: 0, mistakes: 0, hints: 0, assists: 0 });
   const [, setVoiceTick] = useState(0);
   const set = useSettings();
@@ -46,9 +49,26 @@ export function App() {
   const stats = useRef({ start: 0, mistakes: 0, hints: 0, assists: 0 });
   const fails = useRef(0);
   const reducedRef = useRef(set.reducedMotion);
+  const runRef = useRef(run);
+  const stepRef = useRef(step);
   phaseRef.current = phase;
   speakingRef.current = speaking;
   reducedRef.current = set.reducedMotion;
+  runRef.current = run;
+  stepRef.current = step;
+
+  // Context sent to AI Mortimer: game state only, never user input (the confession goes through `react`).
+  const aiCtx = useCallback((): AiContext => ({
+    challenge: runRef.current[Math.min(stepRef.current, TOTAL - 1)].id,
+    fails: fails.current,
+    secs: stats.current.start ? (Date.now() - stats.current.start) / 1000 : 0,
+  }), []);
+  const lineFor = useCallback((key: PoolKey) => line(key, aiCtx()), [aiCtx]);
+  const react = useCallback(async (text: string) => {
+    const s = settings.get();
+    if (!s.aiEnabled || !s.aiRoast) return null;
+    return ai.ask('confession-reaction', { ...aiCtx(), challenge: 'secret', text });
+  }, [aiCtx]);
 
   // 3D scene lifecycle
   useEffect(() => {
@@ -101,13 +121,13 @@ export function App() {
     stats.current.mistakes++;
     const n = ++fails.current;
     mood('angry'); shake(); haptic([80, 40, 80]);
-    let line: string;
-    if (n === ASSIST_FAILS) { line = pickLine('assistOffer'); setAssist(true); }
-    else if (n > ASSIST_FAILS) line = pickLine('failKind');
-    else if (n === 3) line = pickLine('failSnark');
-    else line = specific ?? pickLine('failMild');
-    say(line);
-  }, [mood, shake, say]);
+    let text: string;
+    if (n === ASSIST_FAILS) { text = pickLine('assistOffer'); setAssist(true); }
+    else if (n > ASSIST_FAILS) text = lineFor('failKind');
+    else if (n === 3) text = lineFor('failSnark');
+    else text = liveLine('failMild', aiCtx()) ?? specific ?? pickLine('failMild');
+    say(text);
+  }, [mood, shake, say, lineFor, aiCtx]);
 
   const begin = async () => {
     sfx.unlock();
@@ -115,9 +135,13 @@ export function App() {
     const id = ++runId.current;
     const next = makeRun();
     setRun(next);
-    greeting.current = pickLine('greeting');
     stats.current = { start: Date.now(), mistakes: 0, hints: 0, assists: 0 };
     fails.current = 0;
+    runRef.current = next;
+    stepRef.current = 0;
+    greeting.current = lineFor('greeting');
+    warm(('intro_' + next[0].id) as PoolKey);
+    setVerdict('');
     setAssist(false);
     setPhase('greeting');
     await say(greeting.current);
@@ -131,6 +155,12 @@ export function App() {
     fails.current = 0;
     setAssist(false);
     setStep(n);
+    // Warm the live-line cache for this trial and the next, so lines are ready without added latency.
+    const r = runRef.current;
+    const cur = r[n].id;
+    warm('failMild', { challenge: cur }); warm('passGeneric', { challenge: cur }); warm('idle', { challenge: cur });
+    if (n + 1 < TOTAL) warm(('intro_' + r[n + 1].id) as PoolKey);
+    else warm('finale3');
     sceneRef.current?.setProgress(n / TOTAL);
     sceneRef.current?.cam(n + 1);
     sceneRef.current?.mood('neutral');
@@ -154,7 +184,12 @@ export function App() {
     const id = ++runId.current;
     const scene = sceneRef.current;
     const st = stats.current;
-    setResults({ secs: Math.round((Date.now() - st.start) / 1000), mistakes: st.mistakes, hints: st.hints, assists: st.assists });
+    const res = { secs: Math.round((Date.now() - st.start) / 1000), mistakes: st.mistakes, hints: st.hints, assists: st.assists };
+    setResults(res);
+    const { title, pct } = rate(res);
+    // The verdict is generated while the finale plays; scripted card text is used if it does not arrive.
+    ai.ask('humanity-verdict', { secs: res.secs, fails: res.mistakes, extra: `Humanity rating ${pct} percent, title: ${title}.` })
+      .then((v) => { if (v && runId.current === id) setVerdict(v); });
     setPhase('finale');
     setStep(TOTAL);
     scene?.setProgress(1);
@@ -168,7 +203,7 @@ export function App() {
     sfx.play('fanfare');
     await Promise.all([say(pickLine('finale2'), 'boo'), sleep(2500)]);
     if (runId.current !== id) return;
-    await say(pickLine('finale3'));
+    await say(lineFor('finale3'));
     if (runId.current === id) setPhase('done');
   };
 
@@ -179,7 +214,12 @@ export function App() {
     setStep(0);
     setBloom(false);
     setAssist(false);
-    setRun(makeRun());
+    const next = makeRun();
+    setRun(next);
+    runRef.current = next;
+    ai.resetRun();
+    warm('greeting');
+    setVerdict('');
     greeting.current = pickLine('greeting');
     setSub({ who: 'grand', text: greeting.current });
     setSpeaking(false);
@@ -219,14 +259,14 @@ export function App() {
       last = Date.now();
       nudges++;
       stats.current.hints++;
-      say(pickLine('idle') + ' ' + pickLine(run[step].hint));
+      say(lineFor('idle') + ' ' + pickLine(run[step].hint));
       if (nudges >= 3) setAssist(true);
     }, 1000);
     return () => { clearInterval(iv); evs.forEach((e) => window.removeEventListener(e, bump)); };
-  }, [phase, step, run, say]);
+  }, [phase, step, run, say, lineFor]);
 
   const ctx: ChallengeCtx = {
-    say, fail, mood, shake, pass: onPass,
+    say, fail, mood, shake, pass: onPass, line: lineFor, react,
     n: step + 1, total: TOTAL, fails: () => fails.current, reduced: set.reducedMotion,
   };
   const Challenge = run[Math.min(step, TOTAL - 1)].Component;
@@ -291,7 +331,7 @@ export function App() {
             </div>
           )}
           {phase === 'finale' && <div className="center big" aria-label="Boo is waking up">✨</div>}
-          {phase === 'done' && <Results stats={results} onAgain={again} />}
+          {phase === 'done' && <Results stats={results} verdict={verdict} onAgain={again} />}
         </section>
       </div>
       {confetti > 0 && !set.reducedMotion && <Confetti key={confetti} />}

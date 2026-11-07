@@ -33,6 +33,18 @@ Mortimer speaks low and slow, Boo speaks high and fast, using the best English v
 - Audio starts after you press Begin (browsers require a user gesture). A Skip button cuts a line short.
 - The speaker button mutes voice and sound effects together and cancels any line in progress. The choice is saved in `localStorage` (`saveBooMuted`).
 
+## AI Mortimer
+
+Mortimer can improvise fresh lines so every retry feels different: greetings and trial intros, taunts after mistakes, praise, idle hints, a reaction to your typed confession, the finale twist and the final humanity verdict.
+
+- **How it works:** `src/game/ai.ts` calls an OpenAI-compatible chat completions API straight from the browser. The default is the keyless free [Pollinations](https://text.pollinations.ai/openai) endpoint, so there is no backend and no secret in this repo. Lines are prefetched while the current one plays, so there is no added latency.
+- **Always falls back:** every call has a 4 second timeout, output is sanitized (no markdown, emoji or quotes, under 160 characters, unsafe or off-persona text rejected, repeats rejected). On any error, timeout, 429 or bad response the scripted pools in `src/game/lines.ts` are used silently. After 3 failures in a row the AI is skipped for the rest of the run. At most one request is in flight and a run makes at most 40 calls. Offline play works exactly as before.
+- **Privacy:** only game context is sent (trial name, mistake count, elapsed time, recent AI lines). Your typed confession is sent only for Mortimer's reaction to it, the trial says so right under the text box, and it has its own opt-out checkbox. The settings panel (gear icon) has an **AI Mortimer** toggle and a status line (AI live / offline scripted). With the toggle off the game makes zero AI requests.
+- **Bring your own model:** in Settings, "Use my own AI endpoint" accepts any OpenAI-compatible base URL (https, or http on localhost), model name and API key. These are stored only in your browser's localStorage, are sent only to the endpoint you entered, and are never part of the repo or the build.
+- **CORS:** checked against `Origin: https://hackerdy.github.io`, Pollinations answers with `access-control-allow-origin: *` on both the preflight and the POST, so it works from GitHub Pages and from `file://`. If it ever stops allowing browsers, the game just stays on scripted lines and BYO keeps working.
+
+Tests: `npm test` (vitest) covers sanitizing, timeout and error fallback, no-repeat, the toggle and the request limits with a mocked fetch. The playthrough takes `PLAY_AI=block|mock|off` (default `block`): `block` makes the endpoint unreachable, `mock` serves canned lines and asserts they reach the subtitles, `off` asserts zero requests.
+
 ## 3D notes
 
 - Pixel ratio is capped (1.5 on small screens, 2 otherwise) and the scene is low poly.

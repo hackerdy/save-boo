@@ -107,3 +107,8 @@ body.reduced-motion .confetti, body.reduced-motion .bloom { display: none; }
   .lead { font-size: 16px; margin: 2px 0; }
   .stats li { min-width: 56px; padding: 4px 8px; }
 }
+
+.ainote { font-size: 14px; margin-top: 8px; }
+.aistatus { font-size: 14px; margin: 4px 0; }
+.settings input[type=text], .settings input[type=password] { margin: 4px 0 8px; padding: 8px; font-size: 16px; width: 100%; border-radius: 8px; border: 2px solid var(--accent2); background: #0f0c22; color: var(--text); }
+.verdict { font-style: italic; margin: 6px 0; }
