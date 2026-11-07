@@ -1,20 +1,54 @@
 # Save Boo
 
-A Halloween hackathon game. Baby ghost Boo has stopped moving, and the only cure is a human's touch. Grandghost Mortimer will only let you near Boo if you prove you are human, through six absurd challenges. Pass them all to revive Boo.
+A Halloween game in 3D with voice overs. Baby ghost Boo has stopped moving, and the only cure is a human's touch. Grandghost Mortimer will only let you near Boo if you prove you are human, through six absurd challenges. Pass them all to revive Boo.
 
-## How to run
+## Stack
 
-Zero dependencies. Open `index.html` in a browser, or serve it locally:
+- **Vite + React 18 + TypeScript** for the app shell, game flow and the six challenge components
+- **Three.js** (npm, bundled) for the 3D night graveyard, procedural ghosts, fireflies, fog, moonlight and a finale light burst
+- **Web Speech API** for voice overs, **WebAudio** for synthesized sound effects (no audio files, no paid APIs)
+- Built to a **single `dist/index.html`**, so it works on GitHub Pages and also opens straight from disk (file://)
+
+## Run
 
 ```
-python3 -m http.server
+npm install
+npm run dev        # dev server with hot reload
+npm run build      # typecheck + production build into dist/
+npm run preview    # serve the production build
 ```
 
-Then visit http://localhost:8000.
+Open `dist/index.html` directly after a build if you like, no server needed.
 
-## Sound
+## Deploy to GitHub Pages
 
-Sound effects are synthesized with the WebAudio API (no audio files). Audio starts after your first click; use the 🔊/🔇 button in the header to mute. Your choice is remembered.
+`.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`. In the repo settings, set Pages source to "GitHub Actions".
+
+## Voice overs
+
+Mortimer speaks low and slow, Boo speaks high and fast, using the best English voice the browser offers (for example Daniel, Google UK English Male, Samantha, Zira). Voices differ per device, so the exact sound varies. Notes:
+
+- Subtitles are always shown, with the speaker name, even when muted or when the browser has no speech support.
+- Mouths animate while a line is spoken (timer driven plus word boundary accents).
+- Audio starts after you press Begin (browsers require a user gesture). A Skip button cuts a line short.
+- The speaker button mutes voice and sound effects together and cancels any line in progress. The choice is saved in `localStorage` (`saveBooMuted`).
+
+## 3D notes
+
+- Pixel ratio is capped (1.5 on small screens, 2 otherwise) and the scene is low poly.
+- The camera moves per challenge, punches on a wrong answer, and Boo glows brighter with each passed trial.
+- If WebGL is unavailable the game falls back to a simple emoji stage and stays fully playable.
+
+## Project layout
+
+```
+src/App.tsx                     game flow, subtitles, HUD
+src/challenges/Challenges.tsx   the six challenges
+src/game/scene3d.ts             Three.js scene
+src/game/voice.ts               speech synthesis
+src/game/sfx.ts                 WebAudio sound effects
+scripts/playthrough.mjs         headless Playwright playthrough (see docs/TEST_REPORT.md)
+```
 
 ## Challenges
 

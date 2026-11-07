@@ -2,51 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Save Boo — Prove You're Human</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0820" />
+  <title>Save Boo: Prove You're Human</title>
 </head>
 <body>
-  <div class="fog"></div>
-  <main id="app">
-    <header>
-      <h1>👻 Save Boo</h1>
-      <button id="muteBtn" type="button" title="Toggle sound">🔊</button>
-      <div id="progress" aria-label="progress"></div>
-    </header>
-
-    <section id="stage">
-      <div id="baby" class="ghost-box">
-        <svg viewBox="0 0 100 120" id="babySvg" aria-label="Baby ghost Boo">
-          <path d="M10 110 V50 a40 40 0 0 1 80 0 V110 l-13 -10 l-13 10 l-14 -10 l-13 10 l-14 -10 l-13 10z" class="body"/>
-          <circle cx="38" cy="52" r="6" fill="#222"/><circle cx="62" cy="52" r="6" fill="#222"/>
-          <circle cx="40" cy="50" r="2" fill="#fff"/><circle cx="64" cy="50" r="2" fill="#fff"/>
-          <ellipse cx="50" cy="68" rx="5" ry="4" fill="#222" id="babyMouth"/>
-          <circle cx="28" cy="64" r="5" fill="#ff8fb1" opacity=".6"/><circle cx="72" cy="64" r="5" fill="#ff8fb1" opacity=".6"/>
-        </svg>
-        <div class="caption">Boo (age: 3 haunts)</div>
-      </div>
-
-      <div id="grand" class="ghost-box">
-        <svg viewBox="0 0 120 140" aria-label="Grandghost">
-          <path d="M8 130 V60 a52 52 0 0 1 104 0 V130 l-17 -12 l-17 12 l-18 -12 l-17 12 l-18 -12 l-17 12z" fill="#e9e9f5"/>
-          <path d="M22 40 q38 -34 76 0" fill="none" stroke="#bbb" stroke-width="6" stroke-linecap="round"/>
-          <circle cx="42" cy="62" r="14" fill="none" stroke="#555" stroke-width="3"/>
-          <circle cx="78" cy="62" r="14" fill="none" stroke="#555" stroke-width="3"/>
-          <line x1="56" y1="62" x2="64" y2="62" stroke="#555" stroke-width="3"/>
-          <circle cx="42" cy="62" r="4" fill="#222" class="pupil"/><circle cx="78" cy="62" r="4" fill="#222" class="pupil"/>
-          <path d="M45 98 q15 -10 30 0" fill="none" stroke="#444" stroke-width="3" stroke-linecap="round" id="grandMouth"/>
-          <path d="M30 50 l12 -4 M90 50 l-12 -4" stroke="#999" stroke-width="4" stroke-linecap="round"/>
-        </svg>
-        <div class="caption">Grandghost Mortimer</div>
-      </div>
-    </section>
-
-    <section id="speech" aria-live="polite"></section>
-    <section id="challenge"></section>
-  </main>
-
-  <script src="sfx.js"></script>
-  <script src="game.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

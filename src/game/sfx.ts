@@ -1,14 +1,15 @@
 // Sound effects via WebAudio only. Fails silently if unavailable.
-const sfx = (() => {
+export const sfx = (() => {
   let ctx = null, master = null, drone = null, inhale = null;
   let muted = false;
+  const listeners: Array<(m: boolean) => void> = [];
   try { muted = localStorage.getItem('saveBooMuted') === '1'; } catch (e) {}
 
   const safe = (fn) => (...a) => { try { return fn(...a); } catch (e) {} };
 
   const unlock = safe(() => {
     if (!ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
       if (!AC) return;
       ctx = new AC();
       master = ctx.createGain();
@@ -80,19 +81,9 @@ const sfx = (() => {
       muted = m;
       try { localStorage.setItem('saveBooMuted', m ? '1' : '0'); } catch (e) {}
       if (master) master.gain.value = m ? 0 : 1;
+      listeners.forEach((f) => f(m));
     }),
+    onMuteChange: (f: (m: boolean) => void) => { listeners.push(f); },
   };
 })();
 
-(() => {
-  const btn = document.getElementById('muteBtn');
-  const render = () => {
-    btn.textContent = sfx.isMuted() ? '🔇' : '🔊';
-    btn.setAttribute('aria-label', sfx.isMuted() ? 'Unmute sound' : 'Mute sound');
-    btn.setAttribute('aria-pressed', String(sfx.isMuted()));
-  };
-  btn.addEventListener('click', () => { sfx.unlock(); sfx.setMuted(!sfx.isMuted()); render(); });
-  render();
-  window.addEventListener('pointerdown', sfx.unlock);
-  window.addEventListener('keydown', sfx.unlock);
-})();
