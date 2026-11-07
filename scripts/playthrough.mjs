@@ -137,10 +137,19 @@ for (let n = 0; n < 6; n++) {
     else { await page.fill('#ans', word); await page.click('#go'); }
   } else if (id === 'breathe') {
     const b = await page.locator('#breathBtn').boundingBox();
+    const msgIs = (re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('breathMsg')?.innerText || ''), re.source, { timeout: 15000 });
     for (let i = 0; i < 2; i++) {
-      if (kb) { await page.focus('#breathBtn'); await page.keyboard.down('Space'); }
-      else { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); }
-      await page.waitForTimeout(2800);
+      // Retry the press until the app reports it is inhaling (slow runners can drop the first event), then
+      // hold until it says EXHALE instead of trusting a fixed sleep.
+      for (let attempt = 0; ; attempt++) {
+        if (kb) { await page.focus('#breathBtn'); await page.keyboard.down('Space'); }
+        else { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); }
+        try { await msgIs(/Inhaling|EXHALE/); break; } catch (e) {
+          if (kb) await page.keyboard.up('Space'); else await page.mouse.up();
+          if (attempt >= 3) throw e;
+        }
+      }
+      await msgIs(/EXHALE/);
       if (i === 0 && !kb) await shot('07-challenge4');
       if (kb) await page.keyboard.up('Space'); else await page.mouse.up();
       await page.waitForTimeout(300);
